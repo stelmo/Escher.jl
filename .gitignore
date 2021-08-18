@@ -2,3 +2,8 @@
 *.jl.*.cov
 *.jl.mem
 deps/deps.jl
+
+temp.jl
+*.json
+*.pdf
+*.png
