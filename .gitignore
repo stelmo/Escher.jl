@@ -7,3 +7,7 @@ temp.jl
 *.json
 *.pdf
 *.png
+
+/vscode
+/.vscode
+Manifest.toml
