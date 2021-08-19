@@ -45,27 +45,28 @@ end
 
 @recipe(EscherPlot) do scene
     Attributes(
+        metabolite_identifier = "bigg_id",
         metabolite_show_text = false,
         metabolite_text_size = 4,
         metabolite_primary_node_size = 5,
         metabolite_secondary_node_size = 3,
         metabolite_node_color = :black,
         metabolite_text_color = :black,
-        metabolite_identifier = "bigg_id",
-        reaction_show_text = false,
-        reaction_text_size = 4,
         reaction_identifier = "bigg_id",
-        reaction_edge_width = 2.0,
-        reaction_edge_color_weights = Dict{String,Float64}(),
-        reaction_edge_width_weights = Dict{String,Float64}(),
+        reaction_show_text = false,
+        reaction_show_name_instead_of_id = false,
+        reaction_text_size = 4,
+        reaction_text_color = :black,
+        reaction_edge_colors = Dict{String,Any}(), # actual color
+        reaction_edge_color = :black, # fallback color
+        reaction_edge_widths = Dict{String,Any}(), # actual edge width
+        reaction_edge_width = 2.0, # fallback width
     )
 end
 
 function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
 
     _, escher = JSON.parsefile(to_value(ep[1]))
-
-    reaction_identifier = to_value(ep.reaction_identifier)
 
     metabolite_node_xs,
     metabolite_node_ys,
@@ -77,10 +78,51 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
         escher;
         primary_node_size = to_value(ep.metabolite_primary_node_size),
         secondary_node_size = to_value(ep.metabolite_secondary_node_size),
+        metabolite_identifier = to_value(ep.metabolite_identifier),
     )
 
-    lw = 0.0
+    reaction_labels = String[]
+    reaction_label_xs = Float64[]
+    reaction_label_ys = Float64[]
+    reaction_id_to_id = Dict(
+        rid => rxn[to_value(ep.reaction_identifier)] for (rid, rxn) in escher["reactions"]
+    )
     for (rid, rxn) in escher["reactions"]
+        # collect reaction label information
+        if ep.reaction_show_name_instead_of_id[]
+            if haskey(rxn, "name")
+                push!(reaction_labels, rxn["name"])
+                push!(reaction_label_xs, rxn["label_x"])
+                push!(reaction_label_ys, -rxn["label_y"])
+            end
+        else
+            if haskey(rxn, ep.reaction_identifier[])
+                push!(reaction_labels, rxn[ep.reaction_identifier[]])
+                push!(reaction_label_xs, rxn["label_x"])
+                push!(reaction_label_ys, -rxn["label_y"])
+            end
+        end
+
+        val_rid = reaction_id_to_id[rid]
+
+        lw =
+            haskey(to_value(ep.reaction_edge_widths), val_rid) ?
+            to_value(ep.reaction_edge_widths)[val_rid] : ep.reaction_edge_width
+        c =
+            haskey(to_value(ep.reaction_edge_colors), val_rid) ?
+            to_value(ep.reaction_edge_colors)[val_rid] : ep.reaction_edge_color
+
+        if isempty(to_value(ep.reaction_edge_widths)) &&
+           isempty(to_value(ep.reaction_edge_color_weights))
+            no_reaction_data = false
+        elseif haskey(to_value(ep.reaction_edge_widths), val_rid) ||
+               haskey(to_value(ep.reaction_edge_colors), val_rid)
+            no_reaction_data = false
+        else
+            no_reaction_data = true
+        end
+
+        # linestyle = :dot if missing information
         for (_, segment) in rxn["segments"]
             if !isnothing(segment["b1"]) && !isnothing(segment["b2"])
                 n1 = metabolite_node_pos[segment["from_node_id"]]
@@ -93,29 +135,25 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
                 ds = _bezier.(ts, Ref(p0), Ref(p1), Ref(p2), Ref(p3))
                 xs = [d[1] for d in ds]
                 ys = [d[2] for d in ds]
-                if lw == -1.0
-                    lines!(ep, xs, ys, linewidth = ep.reaction_edge_width, linestyle = :dot)
+                if no_reaction_data
+                    lines!(ep, xs, ys, linewidth = lw, linestyle = :dot, color = c)
                 else
-                    lines!(ep, xs, ys, linewidth = ep.reaction_edge_width)
+                    lines!(ep, xs, ys, linewidth = lw, color = c)
                 end
             else
                 n1 = metabolite_node_pos[segment["from_node_id"]]
                 n2 = metabolite_node_pos[segment["to_node_id"]]
-                if lw == -1.0
+                if no_reaction_data
                     lines!(
                         ep,
                         [n1[1], n2[1]],
                         [n1[2], n2[2]],
-                        linewidth = ep.reaction_edge_width,
+                        linewidth = lw,
                         linestyle = :dot,
+                        color = c,
                     )
                 else
-                    lines!(
-                        ep,
-                        [n1[1], n2[1]],
-                        [n1[2], n2[2]],
-                        linewidth = ep.reaction_edge_width,
-                    )
+                    lines!(ep, [n1[1], n2[1]], [n1[2], n2[2]], linewidth = lw, color = c)
                 end
             end
         end
@@ -132,91 +170,35 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
     if ep.metabolite_show_text[]
         positions = [
             (metabolite_label_xs[i], metabolite_label_ys[i]) for
-            i = 1:length(metabolite_labels)
+            i in eachindex(metabolite_labels)
         ]
         text!(
             ep,
             metabolite_labels;
             position = positions,
             textsize = ep.metabolite_text_size,
+            color = ep.metabolite_text_color,
         )
+    end
+
+    if ep.reaction_show_text[]
+        positions = [
+            (reaction_label_xs[i], reaction_label_ys[i]) for
+            i in eachindex(reaction_labels)
+        ]
+        text!(
+            ep,
+            reaction_labels;
+            position = positions,
+            textsize = ep.reaction_text_size,
+            color = ep.reaction_text_color,
+        )
+
     end
 
     ep
 end
 
 export plot!
-
-
-# function plot_metabolism(influxes, map_path;
-#     transparent_background=false, colorscheme=ColorSchemes.Reds_9, edge_weights=nothing)
-
-#     # Plot reactions
-
-#     if !isnothing(edge_weights)
-#         efluxes = Dict(k => log(abs(v)) for (k, v) in edge_weights if k in ids_in_map && abs(v) > 1e-8)
-#         eminflux = minimum(values(efluxes))
-#         emaxflux = maximum(values(efluxes))
-#     end
-
-#     # Bezier cubic
-#     fallback_lw = 2.0
-#     for (rid, rxn) in escher["reactions"]
-
-#         if isnothing(edge_weights)
-#             lw = 2
-#         else
-#             if haskey(rxn, "bigg_id") && haskey(efluxes, rxn["bigg_id"])
-#                 enum = (efluxes[rxn["bigg_id"]] - eminflux)/(emaxflux - eminflux)
-#                 lw = 0.5 + 5*enum
-#             else
-#                 lw = 0
-#             end
-#         end
-
-#         if haskey(rxn, "bigg_id") && haskey(fluxes, rxn["bigg_id"])
-#             cnum = (fluxes[rxn["bigg_id"]] - minflux)/(maxflux - minflux)
-#         else
-#             cnum = 0.0
-#             lw = 0.0
-#         end
-
-#         for (_, segment) in rxn["segments"]
-
-#             if !isnothing(segment["b1"]) && !isnothing(segment["b2"])
-#                 n1 = node_pos[segment["from_node_id"]]
-#                 p0 = [n1[1], n1[2]]
-#                 p1 = [segment["b1"]["x"], -segment["b1"]["y"]]
-#                 p2 = [segment["b2"]["x"], -segment["b2"]["y"]]
-#                 n2 = node_pos[segment["to_node_id"]]
-#                 p3 = [n2[1], n2[2]]
-#                 ts = range(0.0, 1.0; length=10)
-#                 ds = B3.(ts, Ref(p0), Ref(p1), Ref(p2), Ref(p3))
-#                 xs = [d[1] for d in ds]
-#                 ys = [d[2] for d in ds]
-#                 if lw == 0
-#                     lines!(ax, xs, ys, linewidth=fallback_lw, color=get(colorscheme, cnum), linestyle=:dot)
-#                 else
-#                     lines!(ax, xs, ys, linewidth=lw, color=get(colorscheme, cnum))
-#                 end
-#             else
-#                 n1 = node_pos[segment["from_node_id"]]
-#                 n2 = node_pos[segment["to_node_id"]]
-#                 if lw == 0
-#                     lines!(ax, [n1[1], n2[1]], [n1[2], n2[2]], linewidth=fallback_lw, color=get(colorscheme, cnum), linestyle=:dot)
-#                 else
-#                     lines!(ax, [n1[1], n2[1]], [n1[2], n2[2]], linewidth=lw, color=get(colorscheme, cnum))
-#                 end
-#             end
-#         end
-#     end
-
-#     hidexdecorations!(ax)
-#     hideydecorations!(ax)
-#     Colorbar(fig[2,1], limits=(0, 1), colormap=colorscheme, label="Flux [AU]", vertical = false)
-
-#     return fig
-# end
-
 
 end # module
