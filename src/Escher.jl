@@ -2,9 +2,25 @@ module Escher
 
 using JSON, Makie
 
+"""
+    _bezier(t, p0, p1, p2, p3)
+
+Plot a Bezier curve with `t` in `[0,1]` and fixed points `p0`, `p1`, `p2`, `p3`.
+"""
 _bezier(t, p0, p1, p2, p3) =
     (1 - t)^3 .* p0 + 3 * (1 - t)^2 * t .* p1 + 3 * (1 - t) * t^2 .* p2 + t^3 .* p3
 
+"""
+    _nodes(
+        escher;
+        primary_node_size = 5,
+        secondary_node_size = 3,
+        metabolite_identifier = "bigg_id",
+    )
+
+Helper function to extract metabolite node information from `escher`. The kwargs set plot
+details.
+"""
 function _nodes(
     escher;
     primary_node_size = 5,
@@ -43,6 +59,37 @@ function _nodes(
     return nodexs, nodeys, node_pos, markersizes, labelxs, labelys, metabolite_labels
 end
 
+"""
+Plot a metabolic map that is compatible with Escher. The only required argument is the
+location of the metabolic map in `json` format.
+
+# Example
+```
+escherplot("core-map.json"; kwargs...)
+```
+Here `kwargs` are supported attributes, see the `readme` for more information.
+
+# Attributes
+```
+metabolite_identifier = "bigg_id"
+metabolite_show_text = false
+metabolite_text_size = 4
+metabolite_primary_node_size = 5
+metabolite_secondary_node_size = 3
+metabolite_node_color = :black
+metabolite_text_color = :black
+reaction_identifier = "bigg_id"
+reaction_show_text = false
+reaction_show_name_instead_of_id = false
+reaction_text_size = 4
+reaction_text_color = :black
+reaction_edge_colors = Dict{String,Any}()
+reaction_edge_color = :black
+reaction_edge_widths = Dict{String,Any}()
+reaction_edge_width = 2.0
+```
+Get or create maps here: `https://escher.github.io/#/`.
+"""
 @recipe(EscherPlot) do scene
     Attributes(
         metabolite_identifier = "bigg_id",
