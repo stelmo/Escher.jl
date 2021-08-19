@@ -26,6 +26,9 @@ function _nodes(
     primary_node_size = 5,
     secondary_node_size = 3,
     metabolite_identifier = "bigg_id",
+    metabolite_node_sizes = Dict{String,Any}(),
+    metabolite_node_colors = Dict{String,Any}(),
+    metabolite_node_color = :black,
 )
     nodexs = Float64[]
     nodeys = Float64[]
@@ -34,6 +37,7 @@ function _nodes(
     metabolite_labels = String[]
     node_pos = Dict()
     markersizes = Float64[]
+    markercolors = []
     for (node_id, node) in escher["nodes"]
         if haskey(node, "x") && haskey(node, "y")
             x = node["x"]
@@ -48,15 +52,31 @@ function _nodes(
                 end
                 push!(nodexs, x)
                 push!(nodeys, y)
-                if node["node_is_primary"]
-                    push!(markersizes, primary_node_size)
+                if haskey(metabolite_node_colors, node[metabolite_identifier])
+                    push!(markercolors, metabolite_node_colors[node[metabolite_identifier]])
                 else
-                    push!(markersizes, secondary_node_size)
+                    push!(markercolors, metabolite_node_color) # fallback
+                end
+                if haskey(metabolite_node_sizes, node[metabolite_identifier])
+                    push!(markersizes, metabolite_node_sizes[node[metabolite_identifier]])
+                else
+                    if node["node_is_primary"] # fallback
+                        push!(markersizes, primary_node_size)
+                    else
+                        push!(markersizes, secondary_node_size)
+                    end
                 end
             end
         end
     end
-    return nodexs, nodeys, node_pos, markersizes, labelxs, labelys, metabolite_labels
+    return nodexs,
+    nodeys,
+    node_pos,
+    markersizes,
+    labelxs,
+    labelys,
+    metabolite_labels,
+    markercolors
 end
 
 """
@@ -95,15 +115,17 @@ Get or create maps here: `https://escher.github.io/#/`.
         metabolite_identifier = "bigg_id",
         metabolite_show_text = false,
         metabolite_text_size = 4,
-        metabolite_primary_node_size = 5,
-        metabolite_secondary_node_size = 3,
-        metabolite_node_color = :black, # could be a vector, but order not fixed TODO
-        metabolite_text_color = :black, # could be a vector, but order not fixed TODO
+        metabolite_primary_node_size = 5, # fallback size
+        metabolite_secondary_node_size = 3, # fallback size
+        metabolite_node_sizes = Dict{String,Any}(),
+        metabolite_node_colors = Dict{String,Any}(),
+        metabolite_node_color = :black, # fallback color
+        metabolite_text_color = :black,
         reaction_identifier = "bigg_id",
         reaction_show_text = false,
         reaction_show_name_instead_of_id = false,
         reaction_text_size = 4,
-        reaction_text_color = :black, # could be a vector, but order not fixed TODO
+        reaction_text_color = :black,
         reaction_edge_colors = Dict{String,Any}(), # actual color
         reaction_edge_color = :black, # fallback color
         reaction_edge_widths = Dict{String,Any}(), # actual edge width
@@ -121,11 +143,15 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
     metabolite_markersizes,
     metabolite_label_xs,
     metabolite_label_ys,
-    metabolite_labels = _nodes(
+    metabolite_labels,
+    metabolite_marker_colors = _nodes(
         escher;
         primary_node_size = to_value(ep.metabolite_primary_node_size),
         secondary_node_size = to_value(ep.metabolite_secondary_node_size),
         metabolite_identifier = to_value(ep.metabolite_identifier),
+        metabolite_node_sizes = to_value(ep.metabolite_node_sizes),
+        metabolite_node_colors = to_value(ep.metabolite_node_colors),
+        metabolite_node_color = to_value(ep.metabolite_node_color),
     )
 
     reaction_labels = String[]
@@ -160,7 +186,7 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
             to_value(ep.reaction_edge_colors)[val_rid] : ep.reaction_edge_color
 
         if isempty(to_value(ep.reaction_edge_widths)) &&
-           isempty(to_value(ep.reaction_edge_color_weights))
+           isempty(to_value(ep.reaction_edge_colors))
             no_reaction_data = false
         elseif haskey(to_value(ep.reaction_edge_widths), val_rid) ||
                haskey(to_value(ep.reaction_edge_colors), val_rid)
@@ -210,7 +236,7 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
         ep,
         metabolite_node_xs,
         metabolite_node_ys,
-        color = ep.metabolite_node_color,
+        color = metabolite_marker_colors,
         markersize = metabolite_markersizes,
     )
 
