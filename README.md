@@ -1,3 +1,8 @@
+<br>
+<div align="center">
+    <img src="data/logo.svg?maxAge=0" width="80%">
+</div>
+
 # Escher.jl
 
 This package implements a single [Makie](https://makie.juliaplots.org/stable/index.html)
