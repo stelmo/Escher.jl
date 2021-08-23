@@ -91,22 +91,24 @@ Here `kwargs` are supported attributes, see the `readme` for more information.
 
 # Attributes
 ```
-metabolite_identifier = "bigg_id"
-metabolite_show_text = false
-metabolite_text_size = 4
-metabolite_primary_node_size = 5
-metabolite_secondary_node_size = 3
-metabolite_node_color = :black
-metabolite_text_color = :black
-reaction_identifier = "bigg_id"
-reaction_show_text = false
-reaction_show_name_instead_of_id = false
-reaction_text_size = 4
-reaction_text_color = :black
-reaction_edge_colors = Dict{String,Any}()
-reaction_edge_color = :black
-reaction_edge_widths = Dict{String,Any}()
-reaction_edge_width = 2.0
+metabolite_identifier = "bigg_id",
+metabolite_show_text = false,
+metabolite_text_size = 4,
+metabolite_primary_node_size = 5,
+metabolite_secondary_node_size = 3,
+metabolite_node_sizes = Dict{String,Any}(),
+metabolite_node_colors = Dict{String,Any}(),
+metabolite_node_color = :black, # fallback color
+metabolite_text_color = :black,
+reaction_identifier = "bigg_id",
+reaction_show_text = false,
+reaction_show_name_instead_of_id = false,
+reaction_text_size = 4,
+reaction_text_color = :black,
+reaction_edge_colors = Dict{String,Any}(),
+reaction_edge_color = :black, # fallback color
+reaction_edge_widths = Dict{String,Any}(),
+reaction_edge_width = 2.0, # fallback width
 ```
 Get or create maps here: `https://escher.github.io/#/`.
 """

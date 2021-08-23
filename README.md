@@ -3,17 +3,64 @@
     <img src="data/logo.svg?maxAge=0" width="30%">
 </div>
 
+[repostatus-url]: https://www.repostatus.org/#active
+[repostatus-img]: https://www.repostatus.org/badges/latest/active.svg
+
+[![repostatus-img]][repostatus-url]
+
 This package implements a single [Makie](https://makie.juliaplots.org/stable/index.html)
 recipe called `escherplot` that plots maps of metabolic models resembling its [namesake
-GUI](https://escher.github.io/#/). It's primary purpose is to facilitate the generation of
+GUI](https://escher.github.io/#/). Its primary purpose is to facilitate the generation of
 high quality metabolic maps from within Julia.
 
-## Example
+## Plot the core metabolism of E. coli with fluxes
+Here [COBREXA.jl](https://github.com/LCSB-BioCore/COBREXA.jl) is used to estimate fluxes of
+reactions using the [metabolic model of iJO1366](http://bigg.ucsd.edu/models/iJO1366), an E. coli
+metabolic model. The associated map can be downloaded from the [Escher website](https://escher.github.io/#/).
+```julia
+using Escher, CairoMakie, ColorSchemes
+using COBREXA, Gurobi
+using Clustering
+
+# use COBREXA to generate a flux distribution using the associated model
+model = load_model("data/iJO1366-model.json")
+fluxes = round.(
+    abs.(
+        parsimonious_flux_balance_analysis_vec(model, Gurobi.Optimizer)
+    ),
+    digits=3
+)
+
+clusters = kmeans(fluxes', 9) # cluster fluxes for display purposes
+
+rc = Dict(rid => ColorSchemes.RdYlBu_9[10-k]
+    for (rid, k, v) in zip(reactions(model), assignments(clusters), fluxes))
+
+f = Figure(resolution = (1200, 800));
+ax = Axis(f[1, 1]);
+escherplot!(
+    ax,
+    "data/iJO1366-map.json";
+    reaction_edge_colors = rc,
+)
+hidexdecorations!(ax)
+hideydecorations!(ax)
+f
+```
+<br>
+<div align="center">
+    <img src="data/iJO1366-map.svg?maxAge=0" width="80%">
+</div>
+
+## Overlay even more data with colors and node/edge sizes
+The previous example only highlighted reactions according to their fluxes. `Escher.jl` also
+allows you to control the size and colors of the nodes, as well as the size of the reaction
+edges. This time we will use a [smaller "core" model](http://bigg.ucsd.edu/models/e_coli_core)
+with its associated map.
 ```julia
 using Escher, CairoMakie, ColorSchemes
 using COBREXA, Gurobi
 
-# use COBREXA to generate a flux distribution using the associated model
 model = load_model("core-model.json")
 sol = parsimonious_flux_balance_analysis_dict(model, Gurobi.Optimizer)
 
@@ -54,7 +101,7 @@ f = Figure(resolution = (1200, 800));
 ax = Axis(f[1, 1]);
 escherplot!(
     ax,
-    "core-map.json";
+    "data/core-map.json";
     reaction_edge_widths = re,
     reaction_edge_colors = rc,
     metabolite_node_colors = mc,
@@ -63,7 +110,6 @@ escherplot!(
 hidexdecorations!(ax)
 hideydecorations!(ax)
 f
-CairoMakie.FileIO.save("map.svg", f) # save figure
 ```
 This results in:
 <br>
@@ -98,12 +144,6 @@ reaction_edge_width = 2.0 # fallback width in case reaction id not present in re
 Note, if `reaction_edge_colors` or `reaction_edge_widths` are supplied but missing an id
 that is present in the map, the associated edge will be dotted.
 
-## To do
-Feel free to submit an issue or a PR if you run intro trouble. Future directions for this
-package include:
-1. Ensuring the dynamic aspects of Makie can be leverage by `Escher.jl`
-2. ???
-
 ## More examples
 These examples all use the same data as the first example, but demonstrate the use of
 different attributes. For brevity it is assumed that the functions below are inserted as
@@ -116,6 +156,7 @@ hidexdecorations!(ax)
 hideydecorations!(ax)
 f
 ```
+
 ### Basic plot
 Basic plot showing only the edges (reactions) and nodes (metabolites).
 ```julia
@@ -159,3 +200,9 @@ escherplot!(
 <div align="center">
     <img src="data/missing-map.svg?maxAge=0" width="80%">
 </div>
+
+## To do
+Feel free to submit an issue or a PR if you run intro trouble. Future directions for this
+package include:
+1. Ensuring the dynamic aspects of Makie can be leverage by `Escher.jl`
+2. ???
