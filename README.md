@@ -145,7 +145,7 @@ Note, if `reaction_edge_colors` or `reaction_edge_widths` are supplied but missi
 that is present in the map, the associated edge will be dotted.
 
 ## More examples
-These examples all use the same data as the first example, but demonstrate the use of
+These examples all use the same data as the second example, but demonstrate the use of
 different attributes. For brevity it is assumed that the functions below are inserted as
 indicated here:
 ```julia
