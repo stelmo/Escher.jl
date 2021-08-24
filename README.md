@@ -33,9 +33,10 @@ fluxes = round.(
 
 clusters = kmeans(fluxes', 9) # cluster fluxes for display purposes
 
-rc = Dict(rid => ColorSchemes.RdYlBu_9[10-k]
-    for (rid, k, v) in zip(reactions(model), assignments(clusters), fluxes))
+rc = Dict(rid => ColorSchemes.RdYlBu_9[10-k] # map reaction id to color
+    for (rid, k) in zip(reactions(model), assignments(clusters)))
 
+# Finally plot it!
 f = Figure(resolution = (1200, 800));
 ax = Axis(f[1, 1]);
 escherplot!(
