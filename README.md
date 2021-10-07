@@ -24,19 +24,19 @@ using Clustering
 
 # use COBREXA to generate a flux distribution using the associated model
 model = load_model("data/iJO1366-model.json")
-fluxes = round.(
-    abs.(
-        parsimonious_flux_balance_analysis_vec(model, Gurobi.Optimizer)
-    ),
-    digits=3
-)
-
-clusters = kmeans(fluxes', 9) # cluster fluxes for display purposes
+#=
+Bin fluxes for display purposes - assigning colors to edges needs to be done
+manually. The binning uses kmeans clustering on logged fluxes due to the large
+differences between fluxes.
+=#
+logged_fluxes = log.(abs.(parsimonious_flux_balance_analysis_vec(model, Gurobi.Optimizer)) .+ 1e-8)
+clusters = kmeans(fluxes', 9)
+centers = Dict(j=>i for (i, j) in enumerate(sortperm(clusters.centers'[:])))
+order = [centers[i] for i in assignments(clusters)]
 
 rc = Dict(rid => ColorSchemes.RdYlBu_9[10-k] # map reaction id to color
-    for (rid, k) in zip(reactions(model), assignments(clusters)))
+    for (rid, k) in zip(reactions(model), order))
 
-# Finally plot it!
 f = Figure(resolution = (1200, 800));
 ax = Axis(f[1, 1]);
 escherplot!(
