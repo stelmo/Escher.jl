@@ -1,7 +1,7 @@
 name = "Escher"
 uuid = "8cc96de1-1b23-48cb-9272-618d67962629"
 authors = ["stelmo <stelmozors@gmail.com>"]
-version = "0.3.0"
+version = "0.4.0"
 
 [deps]
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
