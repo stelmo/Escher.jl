@@ -30,7 +30,7 @@ manually. The binning uses kmeans clustering on logged fluxes due to the large
 differences between fluxes.
 =#
 logged_fluxes = log.(abs.(parsimonious_flux_balance_analysis_vec(model, Gurobi.Optimizer)) .+ 1e-8)
-clusters = kmeans(fluxes', 9)
+clusters = kmeans(logged_fluxes', 9)
 centers = Dict(j=>i for (i, j) in enumerate(sortperm(clusters.centers'[:])))
 order = [centers[i] for i in assignments(clusters)]
 
