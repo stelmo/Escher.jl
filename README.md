@@ -23,7 +23,7 @@ using COBREXA, Gurobi
 using Clustering
 
 # use COBREXA to generate a flux distribution using the associated model
-model = load_model("data/iJO1366-model.json")
+model = load_model(joinpath(pkgdir(Escher), "data", "iJO1366-model.json"))
 #=
 Bin fluxes for display purposes - assigning colors to edges needs to be done
 manually. The binning uses kmeans clustering on logged fluxes due to the large
@@ -41,7 +41,7 @@ f = Figure(resolution = (1200, 800));
 ax = Axis(f[1, 1]);
 escherplot!(
     ax,
-    "data/iJO1366-map.json";
+    joinpath(pkgdir(Escher), "data", "iJO1366-map.json")
     reaction_edge_colors = rc,
 )
 hidexdecorations!(ax)
@@ -62,7 +62,7 @@ with its associated map.
 using Escher, CairoMakie, ColorSchemes
 using COBREXA, Gurobi
 
-model = load_model("core-model.json")
+model = load_model(joinpath(pkgdir(Escher), "data", "core-model.json"))
 sol = parsimonious_flux_balance_analysis_dict(model, Gurobi.Optimizer)
 
 # Find min and max absolute fluxes for normalization
@@ -102,7 +102,7 @@ f = Figure(resolution = (1200, 800));
 ax = Axis(f[1, 1]);
 escherplot!(
     ax,
-    "data/core-map.json";
+    joinpath(pkgdir(Escher), "data", "core-map.json");
     reaction_edge_widths = re,
     reaction_edge_colors = rc,
     metabolite_node_colors = mc,
@@ -161,7 +161,7 @@ f
 ### Basic plot
 Basic plot showing only the edges (reactions) and nodes (metabolites).
 ```julia
-escherplot!(ax, "data/core-map.json")
+escherplot!(ax, joinpath(pkgdir(Escher), "data", "core-map.json"))
 ```
 <br>
 <div align="center">
@@ -173,7 +173,7 @@ Basic plot showing the labels of the nodes and reactions.
 ```julia
 escherplot!(
     ax,
-    "data/core-map.json";
+    joinpath(pkgdir(Escher), "data", "core-map.json");
     metabolite_show_text=true,
     reaction_show_text=true,
 )
@@ -193,7 +193,7 @@ rc = Dict("FBA" => ColorSchemes.RdYlBu_4[4],
     "PYK" => ColorSchemes.RdYlBu_4[1])
 escherplot!(
     ax,
-    "data/core-map.json";
+    joinpath(pkgdir(Escher), "data", "core-map.json");
     reaction_edge_colors = rc,
 )
 ```
