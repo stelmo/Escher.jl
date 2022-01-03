@@ -16,10 +16,11 @@ high quality metabolic maps from within Julia.
 ## Plot the core metabolism of E. coli with fluxes
 Here [COBREXA.jl](https://github.com/LCSB-BioCore/COBREXA.jl) is used to estimate fluxes of
 reactions using the [metabolic model of iJO1366](http://bigg.ucsd.edu/models/iJO1366), an E. coli
-metabolic model. The associated map can be downloaded from the [Escher website](https://escher.github.io/#/).
+metabolic model. The associated map can be downloaded from the [Escher website](https://escher.github.io/#/). If you want to run these examples, please download the associated models and maps, and 
+place them in the `data`directory.
 ```julia
 using Escher, CairoMakie, ColorSchemes
-using COBREXA, Gurobi
+using COBREXA, Tulip
 using Clustering
 
 # use COBREXA to generate a flux distribution using the associated model
@@ -29,7 +30,7 @@ Bin fluxes for display purposes - assigning colors to edges needs to be done
 manually. The binning uses kmeans clustering on logged fluxes due to the large
 differences between fluxes.
 =#
-logged_fluxes = log.(abs.(parsimonious_flux_balance_analysis_vec(model, Gurobi.Optimizer)) .+ 1e-8)
+logged_fluxes = log.(abs.(flux_balance_analysis_vec(model, Tulip.Optimizer)) .+ 1e-8)
 clusters = kmeans(logged_fluxes', 9)
 centers = Dict(j=>i for (i, j) in enumerate(sortperm(clusters.centers'[:])))
 order = [centers[i] for i in assignments(clusters)]
@@ -60,10 +61,10 @@ edges. This time we will use a [smaller "core" model](http://bigg.ucsd.edu/model
 with its associated map.
 ```julia
 using Escher, CairoMakie, ColorSchemes
-using COBREXA, Gurobi
+using COBREXA, Tulip
 
 model = load_model(joinpath(pkgdir(Escher), "data", "core-model.json"))
-sol = parsimonious_flux_balance_analysis_dict(model, Gurobi.Optimizer)
+sol = flux_balance_analysis_dict(model, Tulip.Optimizer)
 
 # Find min and max absolute fluxes for normalization
 maxflux = maximum(abs.(values(sol)))
