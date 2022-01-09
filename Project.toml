@@ -1,13 +1,17 @@
 name = "Escher"
 uuid = "8cc96de1-1b23-48cb-9272-618d67962629"
 authors = ["stelmo <stelmozors@gmail.com>"]
-version = "0.4.0"
+version = "0.5.0"
 
 [deps]
+COBREXA = "babc4406-5200-4a30-9033-bf5ae714c842"
+Clustering = "aaaa29a8-35af-508c-8bc3-b662a17a0fe5"
+ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+Tulip = "6dd1b50a-3aae-11e9-10b5-ef983d2400fa"
 
 [compat]
 JSON = "0.21"
-Makie = "0.15"
-julia = "1.6"
+Makie = "0.15, 0.16"
+julia = "1.6, 1.7"

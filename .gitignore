@@ -4,6 +4,7 @@
 deps/deps.jl
 
 temp.jl
+readme.jl
 *.pdf
 *.png
 
