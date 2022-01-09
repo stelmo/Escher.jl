@@ -143,10 +143,11 @@ reaction_edge_color = :black # fallback color in case reaction id not present in
 reaction_edge_widths = Dict{String,Any}() # reaction id => edge size
 reaction_edge_width = 2.0 # fallback width in case reaction id not present in reaction_edge_widths
 reaction_arrow_size = 6, # arrow size used to indicate reaction direction
-reaction_directions = Dict{String,Any}(), # set reaction direction manually (rid => :f or :b) (relative to model used to construct map)
+reaction_directions = Dict{String,Any}(), # set reaction direction manually (rid => :f or :b)
 ```
 Note, if `reaction_edge_colors` or `reaction_edge_widths` are supplied but missing an id
-that is present in the map, the associated edge will be dotted.
+that is present in the map, the associated edge will be dotted. Also, the `reaction_directions`
+dictionary is relative to the directions of the reactions in the model used to construct the map. 
 
 ## More examples
 These examples all use the same data as the second example, but demonstrate the use of
