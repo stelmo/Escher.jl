@@ -6,7 +6,7 @@
 [repostatus-url]: https://www.repostatus.org/#active
 [repostatus-img]: https://www.repostatus.org/badges/latest/active.svg
 
-[![repostatus-img]][repostatus-url]
+[![repostatus-img]][repostatus-url] [![SBML Downloads](https://shields.io/endpoint?url=https://pkgs.genieframework.com/api/v1/badge/SBML)](https://pkgs.genieframework.com?packages=SBML)
 
 This package implements a single [Makie](https://makie.juliaplots.org/stable/index.html)
 recipe called `escherplot` that plots maps of metabolic models resembling its [namesake
