@@ -269,30 +269,30 @@ Here `kwargs` are supported attributes, see the `readme` for more information.
 
 # Attributes
 ```
-metabolite_identifier = "bigg_id",
-metabolite_show_text = false,
-metabolite_text_size = 4,
-metabolite_primary_node_size = 5, # fallback size
-metabolite_secondary_node_size = 3, # fallback size
-metabolite_node_sizes = Dict{String,Any}(),
-metabolite_node_colors = Dict{String,Any}(),
-metabolite_node_color = :black, # fallback color
-metabolite_text_color = :black,
-reaction_identifier = "bigg_id",
-reaction_show_text = false,
-reaction_show_name_instead_of_id = false,
-reaction_text_size = 4,
-reaction_text_color = :black,
-reaction_edge_colors = Dict{String,Any}(), # actual color
-reaction_edge_color = :black, # fallback color
-reaction_edge_widths = Dict{String,Any}(), # actual edge width
-reaction_edge_width = 2.0, # fallback width
-reaction_arrow_size = 6,
-arrow_head_offset = 15,
-reaction_directions = Dict{String,Tuple{Dict{String,Number},Symbol}}(), # rid => (reaction stoichiometry, :f or :r)
-annotation_show_text = false,
-annotation_text_color = :black,
-annotation_text_size = 8,
+metabolite_identifier = "bigg_id"
+metabolite_show_text = false
+metabolite_text_size = 4
+metabolite_primary_node_size = 5 # fallback size
+metabolite_secondary_node_size = 3 # fallback size
+metabolite_node_sizes = Dict{String,Any}()
+metabolite_node_colors = Dict{String,Any}()
+metabolite_node_color = :black # fallback color
+metabolite_text_color = :black
+reaction_identifier = "bigg_id"
+reaction_show_text = false
+reaction_show_name_instead_of_id = false
+reaction_text_size = 4
+reaction_text_color = :black
+reaction_edge_colors = Dict{String,Any}() # actual color
+reaction_edge_color = :black # fallback color
+reaction_edge_widths = Dict{String,Any}() # actual edge width
+reaction_edge_width = 2.0 # fallback width
+reaction_arrow_size = 6
+reaction_arrow_head_offset_fraction = 0.5 # between 0 and 1
+reaction_directions = Dict{String,Tuple{Dict{String,Number},Symbol}}() # rid => (reaction stoichiometry, :f or :r)
+annotation_show_text = false
+annotation_text_color = :black
+annotation_text_size = 12
 ```
 Get or create maps here: `https://escher.github.io/#/`.
 """
@@ -317,11 +317,11 @@ Get or create maps here: `https://escher.github.io/#/`.
         reaction_edge_widths = Dict{String,Any}(), # actual edge width
         reaction_edge_width = 2.0, # fallback width
         reaction_arrow_size = 6,
-        reaction_arrow_head_offset = 30,
+        reaction_arrow_head_offset_fraction = 0.1, # between 0 and 1
         reaction_directions = Dict{String,Tuple{Dict{String,Number},Symbol}}(), # rid => (reaction stoichiometry, :f or :r)
         annotation_show_text = false,
         annotation_text_color = :black,
-        annotation_text_size = 8,
+        annotation_text_size = 12,
     )
 end
 
@@ -356,29 +356,10 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
         reaction_edge_width = to_value(ep.reaction_edge_width),
     )
 
-    # Plot metabolites 
-    scatter!(
-        ep,
-        metabolites.positions,
-        color = metabolites.colors,
-        markersize = metabolites.markersizes,
-    )
-
-    # Plot metabolite labels
-    if ep.metabolite_show_text[]
-        text!(
-            ep,
-            metabolites.labels;
-            position = metabolites.positions,
-            textsize = ep.metabolite_text_size,
-            color = ep.metabolite_text_color,
-        )
-    end
-
     # Plot reactions
     reaction_directions = to_value(ep.reaction_directions)
     reaction_arrow_size = to_value(ep.reaction_arrow_size)
-    reaction_arrow_head_offset = to_value(ep.reaction_arrow_head_offset)
+    reaction_arrow_head_offset_fraction = to_value(ep.reaction_arrow_head_offset_fraction)
 
     for reaction in reactions
         rid = reaction.rid
@@ -401,26 +382,39 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
             rs = first(reaction_directions[rid])
             dir = last(reaction_directions[rid])
             _d = dir == :f ? 1.0 : -1.0
-            target_metabolites = [mid for (mid, x) in rs if _d*x > 0]
+            target_metabolites = [mid for (mid, x) in rs if _d * x > 0]
             for segment in reaction.segments
                 to_metabolite = segment.to_metabolite
                 from_metabolite = segment.from_metabolite
 
-                if to_metabolite in metabolites.labels && to_metabolite in target_metabolites
-                    offset_idx = length(segment.positions) - reaction_arrow_head_offset            
+                #=
+                Find index that corresponds to reaction_arrow_head_offset_fraction 
+                of the curve length. This is necessary because the scale for curves 
+                is not linear, and makes arrow location tricky.
+                =#
+                if to_metabolite in metabolites.labels &&
+                   to_metabolite in target_metabolites
+                    reaction_arrow_head_offset = _curve_idx(segment, reaction_arrow_head_offset_fraction)
+                    offset_idx = length(segment.positions) - reaction_arrow_head_offset
                     offset_idx2 = offset_idx + 1
-                elseif from_metabolite in metabolites.labels && from_metabolite in target_metabolites
-                    offset_idx = reaction_arrow_head_offset                
+                elseif from_metabolite in metabolites.labels &&
+                       from_metabolite in target_metabolites
+                    reaction_arrow_head_offset = _curve_idx(segment, 1-reaction_arrow_head_offset_fraction)
+                    offset_idx = length(segment.positions) - reaction_arrow_head_offset
                     offset_idx2 = offset_idx - 1
-                else 
+                else
                     continue
                 end
 
                 points = [Point2f(segment.positions[offset_idx]...)]
-                directions = [Point2f(
-                    segment.positions[offset_idx2][1] - segment.positions[offset_idx][1],
-                    segment.positions[offset_idx2][2] - segment.positions[offset_idx][2],
-                )]
+                directions = [
+                    Point2f(
+                        segment.positions[offset_idx2][1] -
+                        segment.positions[offset_idx][1],
+                        segment.positions[offset_idx2][2] -
+                        segment.positions[offset_idx][2],
+                    ),
+                ]
 
                 arrows!(
                     ep,
@@ -447,6 +441,25 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
 
     end
 
+    # Plot metabolites 
+    scatter!(
+        ep,
+        metabolites.positions,
+        color = metabolites.colors,
+        markersize = metabolites.markersizes,
+    )
+
+    # Plot metabolite labels
+    if ep.metabolite_show_text[]
+        text!(
+            ep,
+            metabolites.labels;
+            position = metabolites.positions,
+            textsize = ep.metabolite_text_size,
+            color = ep.metabolite_text_color,
+        )
+    end
+
     # Plot annotations 
     if ep.annotation_show_text[]
         text!(
@@ -460,6 +473,29 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
 
     ep
 end
+
+"""
+$(TYPEDSIGNATURES)
+
+Helper function to approximately measure the length of a curve contained in
+`segment`, and return the index of the first point that is `fraction` larger
+than the total length
+"""
+function _curve_idx(segment, fraction)
+    curve_length = cumsum([
+        _euclidian_dist(p1, p2) for
+        (p1, p2) in zip(segment.positions[1:end-1], segment.positions[2:end])
+    ])
+    findfirst(curve_length .> last(curve_length)*fraction)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+A helper function to calculate the Euclidian distance between 
+points `p1` and `p2`.
+"""
+_euclidian_dist(p1, p2) = sqrt(sum((x - y)^2 for (x, y) in zip(p1, p2)))
 
 export plot!, get_resolution
 

@@ -8,7 +8,7 @@
 
 [![repostatus-img]][repostatus-url] [![Escher Downloads](https://shields.io/endpoint?url=https://pkgs.genieframework.com/api/v1/badge/Escher)](https://pkgs.genieframework.com?packages=Escher)
 
-This package implements a single [Makie](https://makie.juliaplots.org/stable/index.html)
+This package implements a [Makie](https://makie.juliaplots.org/stable/index.html)
 recipe called `escherplot` that plots maps of metabolic models resembling its [namesake
 GUI](https://escher.github.io/#/). Its primary purpose is to facilitate the generation of
 high quality metabolic maps from within Julia.
@@ -139,19 +139,18 @@ reaction_show_name_instead_of_id = false
 reaction_text_size = 4
 reaction_text_color = :black
 reaction_edge_colors = Dict{String,Any}() # actual color
-reaction_edge_color = :black, # fallback color
+reaction_edge_color = :black # fallback color
 reaction_edge_widths = Dict{String,Any}() # actual edge width
 reaction_edge_width = 2.0 # fallback width
 reaction_arrow_size = 6
-reaction_arrow_head_offset = 30
+reaction_arrow_head_offset_fraction = 0.5 # between 0 and 1
 reaction_directions = Dict{String,Tuple{Dict{String,Number},Symbol}}() # rid => (reaction stoichiometry, :f or :r)
 annotation_show_text = false
 annotation_text_color = :black
-annotation_text_size = 8
+annotation_text_size = 12
 ```
 Note, if `reaction_edge_colors` or `reaction_edge_widths` are supplied but missing an id
-that is present in the map, the associated edge will be dotted. Also, the `reaction_directions`
-dictionary is relative to the directions of the reactions in the model used to construct the map. 
+that is present in the map, the associated edge will be dotted. 
 
 ## More examples
 These examples all use the same data as the second example, but demonstrate the use of
@@ -210,8 +209,32 @@ escherplot!(
     <img src="data/missing-map.svg?maxAge=0" width="80%">
 </div>
 
-## To do
-Feel free to submit an issue or a PR if you run intro trouble. Future directions for this
-package include:
-1. Ensuring the dynamic aspects of Makie can be leverage by `Escher.jl`
-2. ???
+### Reaction directions 
+It is also possible to add direction arrows to reactions through the `reaction_directions` attribute. It is a dictionary, which maps reaction ids to reaction stoichiometry of the model used to simulate fluxes, and a symbol `:f` or `:b`. Arrows are then placed on reactions in the forward (`:f`) or reverse (`:r`) direction relative to the supplied stoichiometry of the reaction.
+```julia
+rd = Dict(
+    "PGM" => (Dict("3pg_c" => 1, "2pg_c" => -1), :r),
+    "PYK" => (Dict("pep_c" => -1, "adp_c" => -1, "h_c" => -1.0, "atp_c" => 1.0, "pyr_c" => 1), :f)
+)
+
+escherplot!(
+    ax,
+    joinpath(pkgdir(Escher), "data", "core-map.json");
+    reaction_directions = rd,
+    reaction_show_text = true,
+)
+hidexdecorations!(ax)
+hideydecorations!(ax)
+```
+<br>
+<div align="center">
+    <img src="data/directions-map.svg?maxAge=0" width="80%">
+</div>
+
+### Map dimensions
+Finally, the original map dimensions can be queried by calling `get_resolution`. 
+
+```julia
+h, w, x, y = get_resolution(joinpath(pkgdir(Escher), "data", "core-map.json"))
+f = Figure(resolution = (x, y));
+```
