@@ -183,6 +183,7 @@ escherplot!(
     joinpath(pkgdir(Escher), "data", "core-map.json");
     metabolite_show_text=true,
     reaction_show_text=true,
+    annotation_show_text = true,
 )
 ```
 <br>
@@ -221,6 +222,7 @@ escherplot!(
     ax,
     joinpath(pkgdir(Escher), "data", "core-map.json");
     reaction_directions = rd,
+    reaction_arrow_size = 12,
     reaction_show_text = true,
 )
 hidexdecorations!(ax)
@@ -236,5 +238,6 @@ Finally, the original map dimensions can be queried by calling `get_resolution`.
 
 ```julia
 h, w, x, y = get_resolution(joinpath(pkgdir(Escher), "data", "core-map.json"))
-f = Figure(resolution = (x, y));
+f = Figure(resolution = (x, y))
+...
 ```
