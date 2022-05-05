@@ -5,6 +5,30 @@ using JSON, Makie, DocStringExtensions
 """
 $(TYPEDSIGNATURES)
 
+Return a named tuple with the dimensions of the escher map.
+Fields are `height`, `width`, `x`, and `y`. If the fields are 
+missing in the supplied map, return `missing`. 
+
+# Example
+```
+h,w,x,y = get_resolution(map_location)
+
+f = Figure(resolution = (x, y))
+```
+"""
+function get_resolution(escher_location::String)
+    _, escher = JSON.parsefile(escher_location)
+    (
+        height = height = get(escher["canvas"], "height", missing),
+        width = get(escher["canvas"], "width", missing),
+        x = get(escher["canvas"], "x", missing),
+        y = get(escher["canvas"], "y", missing),
+    )
+end
+
+"""
+$(TYPEDSIGNATURES)
+
 Plot a Bezier curve with `t` in `[0,1]` and fixed points `p0`, `p1`, `p2`, `p3`.
 """
 _bezier(t, p0, p1, p2, p3) =
@@ -13,7 +37,7 @@ _bezier(t, p0, p1, p2, p3) =
 """
 $(TYPEDSIGNATURES)
 
-Helper function to extract metabolite node information from `escher`. The kwargs set plot
+Helper function to extract node information from `escher`. The kwargs set plot
 details.
 """
 function _nodes(
@@ -30,22 +54,29 @@ function _nodes(
     labelxs = Float64[]
     labelys = Float64[]
     metabolite_labels = String[]
-    node_pos = Dict()
+    node_pos_lookup = Dict()
     markersizes = Float64[]
     markercolors = []
-    metabolite_nodes = String[]
+    metabolite_ids = String[]
     for (node_id, node) in escher["nodes"] #  cycle through all nodes 
-        if haskey(node, "x") && haskey(node, "y") # only plot if has (x,y) position 
+        if haskey(node, "x") && haskey(node, "y") # must have location to be meaningful
+            #=
+            In an escher map, nodes can be either metabolites or markers. Metabolites 
+            should get plotted as dots or circles, but markers are used to join reaction 
+            line segments to each other. Use node_pos_lookup to map the internal id of 
+            nodes to their (x,y) positions if they are markers. Otherwise, the nodes 
+            represent metabolites, in which case more plotting information is stripped 
+            from the file.
+            =#
             x = node["x"]
             y = -node["y"]
-            node_pos[node_id] = (x, y) # nodes that connect line segments of reactions 
-            if node["node_type"] == "metabolite" # if node is a metabolite, plot circle 
-                push!(metabolite_nodes, node_id) # internal id 
-                if haskey(node, metabolite_identifier) # plot label of metabolite if it exists
-                    push!(metabolite_labels, node[metabolite_identifier])
-                    push!(labelxs, node["label_x"])
-                    push!(labelys, -node["label_y"])
-                end
+            node_pos_lookup[node_id] = (x, y)
+            #=
+            Strip all the relevant plotting information from the escher file if the 
+            node type is a metabolite, and thus should be plotted.
+            =#
+            if node["node_type"] == "metabolite"
+                push!(metabolite_ids, node_id) # internal id 
                 push!(nodexs, x)
                 push!(nodeys, y)
                 push!(
@@ -64,35 +95,166 @@ function _nodes(
                         node["node_is_primary"] ? primary_node_size : secondary_node_size,
                     ),
                 )
+                # add text label of metabolite if it exists
+                if haskey(node, metabolite_identifier)
+                    push!(metabolite_labels, node[metabolite_identifier])
+                    push!(labelxs, node["label_x"])
+                    push!(labelys, -node["label_y"])
+                end
             end
         end
     end
-    return nodexs,
-    nodeys,
-    node_pos,
-    markersizes,
-    labelxs,
-    labelys,
-    metabolite_labels,
-    markercolors,
-    metabolite_nodes
+    metabolites = (
+        ids = metabolite_ids, # internal ids
+        positions = collect(zip(nodexs, nodeys)),
+        colors = markercolors,
+        label_positions = collect(zip(labelxs, labelys)),
+        markersizes = markersizes,
+        labels = metabolite_labels,
+    )
+    return metabolites, node_pos_lookup
 end
 
 """
 $(TYPEDSIGNATURES)
 
-Return an array of text annotation mappings `x, y, text`.
+Return an named tuple of text annotation mappings.
+The fields are `positions`, which maps `x, y` coordinates 
+to the field `labels`.
 """
 function _text_annotations(escher)
     xs = Float64[]
     ys = Float64[]
     labels = String[]
-    for (id, node) in escher["text_labels"]
+    for (_, node) in escher["text_labels"]
         push!(xs, get(node, "x", 0.0))
-        push!(ys, get(node, "y", 0.0))
-        push!(labels, get(node, "text", ""))       
+        push!(ys, -get(node, "y", 0.0))
+        push!(labels, get(node, "text", ""))
     end
-    return zip(xs, ys, labels)
+    return (positions = collect(zip(xs, ys)), labels = labels)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+A helper function to get edge information from `escher`. Kwargs set 
+plot details.
+"""
+function _edges(
+    escher,
+    node_pos_lookup,
+    metabolite_id_lookup;
+    reaction_identifier = "bigg_id", # used in mapping and possibly to display
+    reaction_show_name_instead_of_id = false, # use name field in escher, not reaction_identifier flag
+    reaction_edge_colors = Dict{String,Any}(), # actual color
+    reaction_edge_color = :black, # fallback color
+    reaction_edge_widths = Dict{String,Any}(), # actual edge width
+    reaction_edge_width = 2.0, # fallback width
+)
+    # reaction label data
+    reaction_labels = String[]
+    reaction_label_xs = Float64[]
+    reaction_label_ys = Float64[]
+
+    #=  
+    A mapping between the human readable reaction id, and the 
+    internal id used for each reaction in an escher map.
+    =#
+    rid_id_lookup = Dict(
+        rid => rxn[to_value(reaction_identifier)] for (rid, rxn) in escher["reactions"]
+    )
+
+    #=
+    A array holding named tuples. Each tuple contains the basic information 
+    necessary to plot the reaction.  
+    =#
+    reactions = []
+    for (id, rxn) in escher["reactions"]
+        # collect reaction label information
+        if reaction_show_name_instead_of_id
+            if haskey(rxn, "name")
+                push!(reaction_labels, rxn["name"])
+                push!(reaction_label_xs, rxn["label_x"])
+                push!(reaction_label_ys, -rxn["label_y"])
+            end
+        else
+            if haskey(rxn, reaction_identifier)
+                push!(reaction_labels, rxn[reaction_identifier])
+                push!(reaction_label_xs, rxn["label_x"])
+                push!(reaction_label_ys, -rxn["label_y"])
+            end
+        end
+
+        rid = rid_id_lookup[id]
+
+        lw = get(reaction_edge_widths, rid, reaction_edge_width)
+        c = get(reaction_edge_colors, rid, reaction_edge_color)
+
+        #=
+        If reaction data is NOT supplied by the user, all reactions are plotted.
+        If reaction data is supplied by the user, dash the lines of reactions missing from these datasets.
+        In making :dot looks better than :dash, so use :dot.
+        =#
+        if isempty(reaction_edge_widths) && isempty(reaction_edge_colors) # no user data
+            dot_reaction_line = false
+        elseif haskey(reaction_edge_widths, rid) || haskey(reaction_edge_colors, rid) # data supplied, test if rxn has data
+            dot_reaction_line = false
+        else
+            dot_reaction_line = true # data supplied, but no rxn data
+        end
+
+        #=
+        An array of named tuples, where each tuple contains the building blocks to plot 
+        one reaction. The building blocks are the reaction segments in the escher map. 
+        The to/from_metabolite field is used to determine the direction of the reaction.
+        =#
+        segments = []
+        for (_, segment) in rxn["segments"]
+            n1 = node_pos_lookup[segment["from_node_id"]]
+            n2 = node_pos_lookup[segment["to_node_id"]]
+            to_metabolite = get(metabolite_id_lookup, segment["to_node_id"], nothing)
+            from_metabolite = get(metabolite_id_lookup, segment["from_node_id"], nothing)
+            if !isnothing(segment["b1"]) && !isnothing(segment["b2"])
+                p0 = [n1[1], n1[2]]
+                p1 = [segment["b1"]["x"], -segment["b1"]["y"]]
+                p2 = [segment["b2"]["x"], -segment["b2"]["y"]]
+                p3 = [n2[1], n2[2]]
+                ts = range(0.0, 1.0; length = 200) # higher resolution => looks smoother
+                ds = _bezier.(ts, Ref(p0), Ref(p1), Ref(p2), Ref(p3))
+                xs = [d[1] for d in ds]
+                ys = [d[2] for d in ds]
+            else
+                xs = range(n1[1], n2[1]; length = 200) # higher resolution => looks smoother
+                ys = range(n1[2], n2[2]; length = 200) # higher resolution => looks smoother
+            end
+            push!(
+                segments,
+                (
+                    positions = collect(zip(xs, ys)),
+                    to_metabolite = to_metabolite,
+                    from_metabolite = from_metabolite,
+                ),
+            )
+        end
+
+        push!(
+            reactions,
+            (
+                color = c,
+                linewidth = lw,
+                rid = rid,
+                segments = segments,
+                dot_reaction_line = dot_reaction_line,
+            ),
+        )
+    end
+
+    reaction_labels = (
+        positions = collect(zip(reaction_label_xs, reaction_label_ys)),
+        labels = reaction_labels,
+    )
+
+    return reaction_labels, reactions
 end
 
 """
@@ -110,8 +272,8 @@ Here `kwargs` are supported attributes, see the `readme` for more information.
 metabolite_identifier = "bigg_id",
 metabolite_show_text = false,
 metabolite_text_size = 4,
-metabolite_primary_node_size = 5,
-metabolite_secondary_node_size = 3,
+metabolite_primary_node_size = 5, # fallback size
+metabolite_secondary_node_size = 3, # fallback size
 metabolite_node_sizes = Dict{String,Any}(),
 metabolite_node_colors = Dict{String,Any}(),
 metabolite_node_color = :black, # fallback color
@@ -121,10 +283,16 @@ reaction_show_text = false,
 reaction_show_name_instead_of_id = false,
 reaction_text_size = 4,
 reaction_text_color = :black,
-reaction_edge_colors = Dict{String,Any}(),
+reaction_edge_colors = Dict{String,Any}(), # actual color
 reaction_edge_color = :black, # fallback color
-reaction_edge_widths = Dict{String,Any}(),
+reaction_edge_widths = Dict{String,Any}(), # actual edge width
 reaction_edge_width = 2.0, # fallback width
+reaction_arrow_size = 6,
+arrow_head_offset = 15,
+reaction_directions = Dict{String,Tuple{Dict{String,Number},Symbol}}(), # rid => (reaction stoichiometry, :f or :r)
+annotation_show_text = false,
+annotation_text_color = :black,
+annotation_text_size = 8,
 ```
 Get or create maps here: `https://escher.github.io/#/`.
 """
@@ -149,7 +317,11 @@ Get or create maps here: `https://escher.github.io/#/`.
         reaction_edge_widths = Dict{String,Any}(), # actual edge width
         reaction_edge_width = 2.0, # fallback width
         reaction_arrow_size = 6,
-        reaction_directions = Dict{String,Any}(), # rid => :f or :b,  relative to model used to construct map
+        reaction_arrow_head_offset = 30,
+        reaction_directions = Dict{String,Tuple{Dict{String,Number},Symbol}}(), # rid => (reaction stoichiometry, :f or :r)
+        annotation_show_text = false,
+        annotation_text_color = :black,
+        annotation_text_size = 8,
     )
 end
 
@@ -157,15 +329,9 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
 
     _, escher = JSON.parsefile(to_value(ep[1]))
 
-    metabolite_node_xs,
-    metabolite_node_ys,
-    metabolite_node_pos,
-    metabolite_markersizes,
-    metabolite_label_xs,
-    metabolite_label_ys,
-    metabolite_labels,
-    metabolite_marker_colors,
-    metabolite_nodes = _nodes(
+    annotations = _text_annotations(escher)
+
+    metabolites, node_pos_lookup = _nodes(
         escher;
         primary_node_size = to_value(ep.metabolite_primary_node_size),
         secondary_node_size = to_value(ep.metabolite_secondary_node_size),
@@ -175,178 +341,126 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
         metabolite_node_color = to_value(ep.metabolite_node_color),
     )
 
-    reaction_labels = String[]
-    reaction_label_xs = Float64[]
-    reaction_label_ys = Float64[]
-    reaction_id_to_id = Dict(
-        rid => rxn[to_value(ep.reaction_identifier)] for (rid, rxn) in escher["reactions"]
+    # internal id to metabolite id lookup, used for direction
+    metabolite_id_lookup = Dict(zip(metabolites.ids, metabolites.labels))
+
+    reaction_labels, reactions = _edges(
+        escher,
+        node_pos_lookup,
+        metabolite_id_lookup;
+        reaction_identifier = to_value(ep.reaction_identifier),
+        reaction_show_name_instead_of_id = to_value(ep.reaction_show_name_instead_of_id),
+        reaction_edge_colors = to_value(ep.reaction_edge_colors),
+        reaction_edge_color = to_value(ep.reaction_edge_color),
+        reaction_edge_widths = to_value(ep.reaction_edge_widths),
+        reaction_edge_width = to_value(ep.reaction_edge_width),
     )
-    for (rid, rxn) in escher["reactions"]
-        # collect reaction label information
-        if ep.reaction_show_name_instead_of_id[]
-            if haskey(rxn, "name")
-                push!(reaction_labels, rxn["name"])
-                push!(reaction_label_xs, rxn["label_x"])
-                push!(reaction_label_ys, -rxn["label_y"])
-            end
-        else
-            if haskey(rxn, ep.reaction_identifier[])
-                push!(reaction_labels, rxn[ep.reaction_identifier[]])
-                push!(reaction_label_xs, rxn["label_x"])
-                push!(reaction_label_ys, -rxn["label_y"])
-            end
-        end
 
-        val_rid = reaction_id_to_id[rid]
-
-        lw =
-            haskey(to_value(ep.reaction_edge_widths), val_rid) ?
-            to_value(ep.reaction_edge_widths)[val_rid] : ep.reaction_edge_width
-        c =
-            haskey(to_value(ep.reaction_edge_colors), val_rid) ?
-            to_value(ep.reaction_edge_colors)[val_rid] : ep.reaction_edge_color
-
-        if isempty(to_value(ep.reaction_edge_widths)) &&
-           isempty(to_value(ep.reaction_edge_colors)) # plot everything because no data supplied
-            no_reaction_data = false
-        elseif haskey(to_value(ep.reaction_edge_widths), val_rid) ||
-               haskey(to_value(ep.reaction_edge_colors), val_rid) # data supplied, test if rxn has data
-            no_reaction_data = false
-        else
-            no_reaction_data = true # data supplied, but no rxn data
-        end
-
-        # linestyle = :dot if missing information
-        for (_, segment) in rxn["segments"]
-            if !isnothing(segment["b1"]) && !isnothing(segment["b2"])
-                n1 = metabolite_node_pos[segment["from_node_id"]]
-                p0 = [n1[1], n1[2]]
-                p1 = [segment["b1"]["x"], -segment["b1"]["y"]]
-                p2 = [segment["b2"]["x"], -segment["b2"]["y"]]
-                n2 = metabolite_node_pos[segment["to_node_id"]]
-                p3 = [n2[1], n2[2]]
-                ts = range(0.0, 1.0; length = 100) # higher resolution => looks smoother
-                ds = _bezier.(ts, Ref(p0), Ref(p1), Ref(p2), Ref(p3))
-                xs = [d[1] for d in ds]
-                ys = [d[2] for d in ds]
-            else
-                n1 = metabolite_node_pos[segment["from_node_id"]]
-                n2 = metabolite_node_pos[segment["to_node_id"]]
-                xs = range(n1[1], n2[1]; length = 100) # higher resolution => looks smoother
-                ys = range(n1[2], n2[2]; length = 100) # higher resolution => looks smoother
-            end
-            # Draw the curves 
-            if isempty(to_value(ep.reaction_directions)) ||
-               !haskey(to_value(ep.reaction_directions), rid)
-                # normal
-                if segment["to_node_id"] in metabolite_nodes
-                    arrow_head_offset = 15
-                    arrows!(
-                        ep,
-                        xs[end-arrow_head_offset:end-arrow_head_offset],
-                        ys[end-arrow_head_offset:end-arrow_head_offset],
-                        [xs[end-arrow_head_offset+1] - xs[end-arrow_head_offset]],
-                        [ys[end-arrow_head_offset+1] - ys[end-arrow_head_offset]],
-                        color = c,
-                        arrowcolow = c,
-                        linewidth = lw,
-                        arrowsize = to_value(ep.reaction_arrow_size),
-                    )
-                end
-                if get(rxn, "reversibility", false) &&
-                   segment["from_node_id"] in metabolite_nodes
-                    arrow_head_offset = 85
-                    arrows!(
-                        ep,
-                        xs[end-arrow_head_offset:end-arrow_head_offset],
-                        ys[end-arrow_head_offset:end-arrow_head_offset],
-                        -[xs[end-arrow_head_offset+1] - xs[end-arrow_head_offset]],
-                        -[ys[end-arrow_head_offset+1] - ys[end-arrow_head_offset]],
-                        color = c,
-                        arrowcolow = c,
-                        linewidth = lw,
-                        arrowsize = to_value(ep.reaction_arrow_size),
-                    )
-                end
-            elseif to_value(ep.reaction_directions)[rid] == :f # forward
-                if segment["to_node_id"] in metabolite_nodes
-                    arrow_head_offset = 15
-                    arrows!(
-                        ep,
-                        xs[end-arrow_head_offset:end-arrow_head_offset],
-                        ys[end-arrow_head_offset:end-arrow_head_offset],
-                        [xs[end-arrow_head_offset+1] - xs[end-arrow_head_offset]],
-                        [ys[end-arrow_head_offset+1] - ys[end-arrow_head_offset]],
-                        color = c,
-                        arrowcolow = c,
-                        linewidth = lw,
-                        arrowsize = to_value(ep.reaction_arrow_size),
-                    )
-                end
-            elseif to_value(ep.reaction_directions)[rid] == :b # reverse
-                if segment["from_node_id"] in metabolite_nodes
-                    arrow_head_offset = 85
-                    arrows!(
-                        ep,
-                        xs[end-arrow_head_offset:end-arrow_head_offset],
-                        ys[end-arrow_head_offset:end-arrow_head_offset],
-                        -[xs[end-arrow_head_offset+1] - xs[end-arrow_head_offset]],
-                        -[ys[end-arrow_head_offset+1] - ys[end-arrow_head_offset]],
-                        color = c,
-                        arrowcolow = c,
-                        linewidth = lw,
-                        arrowsize = to_value(ep.reaction_arrow_size),
-                    )
-                end
-            end
-
-            if no_reaction_data
-                lines!(ep, xs, ys, linewidth = lw, linestyle = :dot, color = c)
-            else
-                lines!(ep, xs, ys, linewidth = lw, color = c)
-            end
-        end
-    end
-
+    # Plot metabolites 
     scatter!(
         ep,
-        metabolite_node_xs,
-        metabolite_node_ys,
-        color = metabolite_marker_colors,
-        markersize = metabolite_markersizes,
+        metabolites.positions,
+        color = metabolites.colors,
+        markersize = metabolites.markersizes,
     )
 
+    # Plot metabolite labels
     if ep.metabolite_show_text[]
-        positions = [
-            (metabolite_label_xs[i], metabolite_label_ys[i]) for
-            i in eachindex(metabolite_labels)
-        ]
         text!(
             ep,
-            metabolite_labels;
-            position = positions,
+            metabolites.labels;
+            position = metabolites.positions,
             textsize = ep.metabolite_text_size,
             color = ep.metabolite_text_color,
         )
     end
 
+    # Plot reactions
+    reaction_directions = to_value(ep.reaction_directions)
+    reaction_arrow_size = to_value(ep.reaction_arrow_size)
+    reaction_arrow_head_offset = to_value(ep.reaction_arrow_head_offset)
+
+    for reaction in reactions
+        rid = reaction.rid
+        color = reaction.color
+        linewidth = reaction.linewidth
+        linestyle = reaction.dot_reaction_line ? :dot : :solid
+        # Plot reaction backbone
+        for segment in reaction.segments
+            lines!(ep, segment.positions; linewidth, linestyle, color)
+        end
+        #=
+        If reaction has direction information supplied, then add that to the
+        plot. The convention is to only add arrows to reactions if the user
+        specifies the direction. Moreover, arrows only point into the metabolite
+        that is produced by the reaction in the direction of flow. No arrows are
+        plotted going from the source metabolite. Lastly, only the arrow head is 
+        plotted, this makes it easier to control the the plot.
+        =#
+        if haskey(reaction_directions, rid)
+            rs = first(reaction_directions[rid])
+            dir = last(reaction_directions[rid])
+            _d = dir == :f ? 1.0 : -1.0
+            target_metabolites = [mid for (mid, x) in rs if _d*x > 0]
+            for segment in reaction.segments
+                to_metabolite = segment.to_metabolite
+                from_metabolite = segment.from_metabolite
+
+                if to_metabolite in metabolites.labels && to_metabolite in target_metabolites
+                    offset_idx = length(segment.positions) - reaction_arrow_head_offset            
+                    offset_idx2 = offset_idx + 1
+                elseif from_metabolite in metabolites.labels && from_metabolite in target_metabolites
+                    offset_idx = reaction_arrow_head_offset                
+                    offset_idx2 = offset_idx - 1
+                else 
+                    continue
+                end
+
+                points = [Point2f(segment.positions[offset_idx]...)]
+                directions = [Point2f(
+                    segment.positions[offset_idx2][1] - segment.positions[offset_idx][1],
+                    segment.positions[offset_idx2][2] - segment.positions[offset_idx][2],
+                )]
+
+                arrows!(
+                    ep,
+                    points,
+                    directions;
+                    arrowcolow = color,
+                    linewidth = 0.0,
+                    arrowsize = reaction_arrow_size,
+                    linestyle,
+                )
+            end
+        end
+    end
+
+    # Plot reaction labels
     if ep.reaction_show_text[]
-        positions = [
-            (reaction_label_xs[i], reaction_label_ys[i]) for i in eachindex(reaction_labels)
-        ]
         text!(
             ep,
-            reaction_labels;
-            position = positions,
+            reaction_labels.labels;
+            position = reaction_labels.positions,
             textsize = ep.reaction_text_size,
             color = ep.reaction_text_color,
         )
 
     end
 
+    # Plot annotations 
+    if ep.annotation_show_text[]
+        text!(
+            ep,
+            annotations.labels;
+            position = annotations.positions,
+            textsize = ep.annotation_text_size,
+            color = ep.annotation_text_color,
+        )
+    end
+
     ep
 end
 
-export plot!
+export plot!, get_resolution
 
 end # module
