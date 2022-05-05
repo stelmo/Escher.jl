@@ -1,9 +1,9 @@
 module Escher
 
-using JSON, Makie
+using JSON, Makie, DocStringExtensions
 
 """
-    _bezier(t, p0, p1, p2, p3)
+$(TYPEDSIGNATURES)
 
 Plot a Bezier curve with `t` in `[0,1]` and fixed points `p0`, `p1`, `p2`, `p3`.
 """
@@ -11,15 +11,7 @@ _bezier(t, p0, p1, p2, p3) =
     (1 - t)^3 .* p0 + 3 * (1 - t)^2 * t .* p1 + 3 * (1 - t) * t^2 .* p2 + t^3 .* p3
 
 """
-    _nodes(
-        escher;
-        primary_node_size = 5,
-        secondary_node_size = 3,
-        metabolite_identifier = "bigg_id",
-        metabolite_node_sizes = Dict{String,Any}(),
-        metabolite_node_colors = Dict{String,Any}(),
-        metabolite_node_color = :black,
-    )
+$(TYPEDSIGNATURES)
 
 Helper function to extract metabolite node information from `escher`. The kwargs set plot
 details.
@@ -42,35 +34,36 @@ function _nodes(
     markersizes = Float64[]
     markercolors = []
     metabolite_nodes = String[]
-    for (node_id, node) in escher["nodes"]
-        if haskey(node, "x") && haskey(node, "y")
+    for (node_id, node) in escher["nodes"] #  cycle through all nodes 
+        if haskey(node, "x") && haskey(node, "y") # only plot if has (x,y) position 
             x = node["x"]
             y = -node["y"]
-            node_pos[node_id] = (x, y)
-            # plotted nodes
-            if node["node_type"] == "metabolite"
-                push!(metabolite_nodes, node_id)
-                if haskey(node, metabolite_identifier)
+            node_pos[node_id] = (x, y) # nodes that connect line segments of reactions 
+            if node["node_type"] == "metabolite" # if node is a metabolite, plot circle 
+                push!(metabolite_nodes, node_id) # internal id 
+                if haskey(node, metabolite_identifier) # plot label of metabolite if it exists
                     push!(metabolite_labels, node[metabolite_identifier])
                     push!(labelxs, node["label_x"])
                     push!(labelys, -node["label_y"])
                 end
                 push!(nodexs, x)
                 push!(nodeys, y)
-                if haskey(metabolite_node_colors, node[metabolite_identifier])
-                    push!(markercolors, metabolite_node_colors[node[metabolite_identifier]])
-                else
-                    push!(markercolors, metabolite_node_color) # fallback
-                end
-                if haskey(metabolite_node_sizes, node[metabolite_identifier])
-                    push!(markersizes, metabolite_node_sizes[node[metabolite_identifier]])
-                else
-                    if node["node_is_primary"] # fallback
-                        push!(markersizes, primary_node_size)
-                    else
-                        push!(markersizes, secondary_node_size)
-                    end
-                end
+                push!(
+                    markercolors,
+                    get(
+                        metabolite_node_colors,
+                        node[metabolite_identifier],
+                        metabolite_node_color,
+                    ),
+                )
+                push!(
+                    markersizes,
+                    get(
+                        metabolite_node_sizes,
+                        node[metabolite_identifier],
+                        node["node_is_primary"] ? primary_node_size : secondary_node_size,
+                    ),
+                )
             end
         end
     end
@@ -83,6 +76,23 @@ function _nodes(
     metabolite_labels,
     markercolors,
     metabolite_nodes
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Return an array of text annotation mappings `x, y, text`.
+"""
+function _text_annotations(escher)
+    xs = Float64[]
+    ys = Float64[]
+    labels = String[]
+    for (id, node) in escher["text_labels"]
+        push!(xs, get(node, "x", 0.0))
+        push!(ys, get(node, "y", 0.0))
+        push!(labels, get(node, "text", ""))       
+    end
+    return zip(xs, ys, labels)
 end
 
 """
@@ -226,7 +236,8 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
                 ys = range(n1[2], n2[2]; length = 100) # higher resolution => looks smoother
             end
             # Draw the curves 
-            if isempty(to_value(ep.reaction_directions)) || !haskey(to_value(ep.reaction_directions), rid)
+            if isempty(to_value(ep.reaction_directions)) ||
+               !haskey(to_value(ep.reaction_directions), rid)
                 # normal
                 if segment["to_node_id"] in metabolite_nodes
                     arrow_head_offset = 15
@@ -234,22 +245,23 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
                         ep,
                         xs[end-arrow_head_offset:end-arrow_head_offset],
                         ys[end-arrow_head_offset:end-arrow_head_offset],
-                        [xs[end-arrow_head_offset+1] - xs[end-arrow_head_offset],],
-                        [ys[end-arrow_head_offset+1] - ys[end-arrow_head_offset],],
+                        [xs[end-arrow_head_offset+1] - xs[end-arrow_head_offset]],
+                        [ys[end-arrow_head_offset+1] - ys[end-arrow_head_offset]],
                         color = c,
                         arrowcolow = c,
                         linewidth = lw,
                         arrowsize = to_value(ep.reaction_arrow_size),
                     )
                 end
-                if get(rxn, "reversibility", false) && segment["from_node_id"] in metabolite_nodes
+                if get(rxn, "reversibility", false) &&
+                   segment["from_node_id"] in metabolite_nodes
                     arrow_head_offset = 85
                     arrows!(
                         ep,
                         xs[end-arrow_head_offset:end-arrow_head_offset],
                         ys[end-arrow_head_offset:end-arrow_head_offset],
-                        -[xs[end-arrow_head_offset+1] - xs[end-arrow_head_offset],],
-                        -[ys[end-arrow_head_offset+1] - ys[end-arrow_head_offset],],
+                        -[xs[end-arrow_head_offset+1] - xs[end-arrow_head_offset]],
+                        -[ys[end-arrow_head_offset+1] - ys[end-arrow_head_offset]],
                         color = c,
                         arrowcolow = c,
                         linewidth = lw,
@@ -263,8 +275,8 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
                         ep,
                         xs[end-arrow_head_offset:end-arrow_head_offset],
                         ys[end-arrow_head_offset:end-arrow_head_offset],
-                        [xs[end-arrow_head_offset+1] - xs[end-arrow_head_offset],],
-                        [ys[end-arrow_head_offset+1] - ys[end-arrow_head_offset],],
+                        [xs[end-arrow_head_offset+1] - xs[end-arrow_head_offset]],
+                        [ys[end-arrow_head_offset+1] - ys[end-arrow_head_offset]],
                         color = c,
                         arrowcolow = c,
                         linewidth = lw,
@@ -278,8 +290,8 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
                         ep,
                         xs[end-arrow_head_offset:end-arrow_head_offset],
                         ys[end-arrow_head_offset:end-arrow_head_offset],
-                        -[xs[end-arrow_head_offset+1] - xs[end-arrow_head_offset],],
-                        -[ys[end-arrow_head_offset+1] - ys[end-arrow_head_offset],],
+                        -[xs[end-arrow_head_offset+1] - xs[end-arrow_head_offset]],
+                        -[ys[end-arrow_head_offset+1] - ys[end-arrow_head_offset]],
                         color = c,
                         arrowcolow = c,
                         linewidth = lw,
@@ -289,22 +301,9 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
             end
 
             if no_reaction_data
-                lines!(
-                    ep,
-                    xs,
-                    ys,
-                    linewidth = lw,
-                    linestyle = :dot,
-                    color = c,
-                )
+                lines!(ep, xs, ys, linewidth = lw, linestyle = :dot, color = c)
             else
-                lines!(
-                    ep,
-                    xs,
-                    ys,
-                    linewidth = lw,
-                    color = c,
-                )
+                lines!(ep, xs, ys, linewidth = lw, color = c)
             end
         end
     end
