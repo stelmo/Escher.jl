@@ -437,8 +437,9 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
             position = reaction_labels.positions,
             textsize = ep.reaction_text_size,
             color = ep.reaction_text_color,
+            # align = (:right, :center),
+            justification = :center,
         )
-
     end
 
     # Plot metabolites 
@@ -457,6 +458,8 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
             position = metabolites.positions,
             textsize = ep.metabolite_text_size,
             color = ep.metabolite_text_color,
+            # align = (:right, :center),
+            justification = :center,
         )
     end
 
@@ -468,6 +471,8 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
             position = annotations.positions,
             textsize = ep.annotation_text_size,
             color = ep.annotation_text_color,
+            # align = (:right, :center),
+            justification = :center,
         )
     end
 
