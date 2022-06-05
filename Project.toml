@@ -1,7 +1,7 @@
 name = "Escher"
 uuid = "8cc96de1-1b23-48cb-9272-618d67962629"
 authors = ["stelmo <stelmozors@gmail.com>"]
-version = "0.6.1"
+version = "0.6.2"
 
 [deps]
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
