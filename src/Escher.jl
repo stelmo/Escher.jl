@@ -491,7 +491,6 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
             position = annotations.positions,
             textsize = ep.annotation_text_size,
             color = ep.annotation_text_color,
-            # align = (:left, :center),
         )
     end
 
