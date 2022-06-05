@@ -53,6 +53,9 @@ function _nodes(
     nodeys = Float64[]
     labelxs = Float64[]
     labelys = Float64[]
+    left_right_aligns = Symbol[]
+    top_bottom_aligns = Symbol[]
+    justifications = Symbol[]
     metabolite_labels = String[]
     node_pos_lookup = Dict()
     markersizes = Float64[]
@@ -97,9 +100,23 @@ function _nodes(
                 )
                 # add text label of metabolite if it exists
                 if haskey(node, metabolite_identifier)
+                    nx = node["label_x"]
+                    ny = -node["label_y"]
                     push!(metabolite_labels, node[metabolite_identifier])
-                    push!(labelxs, node["label_x"])
-                    push!(labelys, -node["label_y"])
+                    push!(labelxs, nx)
+                    push!(labelys, ny)
+                    push!(
+                        left_right_aligns, 
+                        nx < x ? :right : :left, 
+                    )
+                    push!(
+                        justifications, 
+                        nx < x ? :left : :right,
+                    )
+                    push!(
+                        top_bottom_aligns,
+                        ny < y ? :top : :bottom,
+                    )
                 end
             end
         end
@@ -109,6 +126,8 @@ function _nodes(
         positions = collect(zip(nodexs, nodeys)),
         colors = markercolors,
         label_positions = collect(zip(labelxs, labelys)),
+        alignments = collect(zip(left_right_aligns, top_bottom_aligns)),
+        justifications = justifications,
         markersizes = markersizes,
         labels = metabolite_labels,
     )
@@ -437,8 +456,7 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
             position = reaction_labels.positions,
             textsize = ep.reaction_text_size,
             color = ep.reaction_text_color,
-            # align = (:right, :center),
-            justification = :center,
+            align = (:left, :center),
         )
     end
 
@@ -452,15 +470,17 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
 
     # Plot metabolite labels
     if ep.metabolite_show_text[]
-        text!(
-            ep,
-            metabolites.labels;
-            position = metabolites.positions,
-            textsize = ep.metabolite_text_size,
-            color = ep.metabolite_text_color,
-            # align = (:right, :center),
-            justification = :center,
-        )
+        for (label, position, alignment, justification) in zip(metabolites.labels, metabolites.positions, metabolites.alignments, metabolites.justifications)
+            text!(
+                ep,
+                label;
+                position = position,
+                textsize = ep.metabolite_text_size,
+                color = ep.metabolite_text_color,
+                align = alignment,
+                justification = justification,
+            )
+        end
     end
 
     # Plot annotations 
@@ -471,8 +491,7 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
             position = annotations.positions,
             textsize = ep.annotation_text_size,
             color = ep.annotation_text_color,
-            # align = (:right, :center),
-            justification = :center,
+            # align = (:left, :center),
         )
     end
 
