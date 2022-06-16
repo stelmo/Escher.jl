@@ -432,7 +432,7 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
                     ep,
                     points,
                     directions;
-                    arrowcolow = color,
+                    arrowcolor = color,
                     linewidth = 0.0,
                     arrowsize = reaction_arrow_size,
                     linestyle,
