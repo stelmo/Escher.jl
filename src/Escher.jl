@@ -190,18 +190,11 @@ function _edges(
     reactions = []
     for (id, rxn) in escher["reactions"]
         # collect reaction label information
-        if reaction_show_name_instead_of_id
-            if haskey(rxn, "name")
-                push!(reaction_labels, rxn["name"])
-                push!(reaction_label_xs, rxn["label_x"])
-                push!(reaction_label_ys, -rxn["label_y"])
-            end
-        else
-            if haskey(rxn, reaction_identifier)
-                push!(reaction_labels, rxn[reaction_identifier])
-                push!(reaction_label_xs, rxn["label_x"])
-                push!(reaction_label_ys, -rxn["label_y"])
-            end
+        _reaction_identifier = reaction_show_name_instead_of_id ? "name" : reaction_identifier
+        if haskey(rxn, _reaction_identifier)
+            push!(reaction_labels, rxn[_reaction_identifier])
+            push!(reaction_label_xs, rxn["label_x"])
+            push!(reaction_label_ys, -rxn["label_y"])
         end
 
         rid = rid_id_lookup[id]
@@ -456,7 +449,8 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
             position = reaction_labels.positions,
             textsize = ep.reaction_text_size,
             color = ep.reaction_text_color,
-            align = (:left, :center),
+            # align = (:center, :center),
+            # justification = :left,
         )
     end
 
@@ -470,15 +464,15 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
 
     # Plot metabolite labels
     if ep.metabolite_show_text[]
-        for (label, position, alignment, justification) in zip(metabolites.labels, metabolites.positions, metabolites.alignments, metabolites.justifications)
+        for (label, position, alignment, justification) in zip(metabolites.labels, metabolites.label_positions, metabolites.alignments, metabolites.justifications)
             text!(
                 ep,
                 label;
                 position = position,
                 textsize = ep.metabolite_text_size,
                 color = ep.metabolite_text_color,
-                align = alignment,
-                justification = justification,
+                # align = alignment,
+                # justification = justification,
             )
         end
     end
