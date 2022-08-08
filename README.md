@@ -211,11 +211,16 @@ escherplot!(
 </div>
 
 ### Reaction directions 
-It is also possible to add direction arrows to reactions through the `reaction_directions` attribute. It is a dictionary, which maps reaction ids to reaction stoichiometry of the model used to simulate fluxes, and a symbol `:f` or `:b`. Arrows are then placed on reactions in the forward (`:f`) or reverse (`:r`) direction relative to the supplied stoichiometry of the reaction.
+It is also possible to add direction arrows to reactions through the
+`reaction_directions` attribute. It is a dictionary, which maps reaction ids to
+reaction stoichiometry of the model used to simulate fluxes, and a symbol
+`:forward`, `:backward`, `:bidirectional`. Arrows are then placed on reactions
+in the direction relative to the supplied stoichiometry of the reaction.
 ```julia
 rd = Dict(
-    "PGM" => (Dict("3pg_c" => 1, "2pg_c" => -1), :r),
-    "PYK" => (Dict("pep_c" => -1, "adp_c" => -1, "h_c" => -1.0, "atp_c" => 1.0, "pyr_c" => 1), :f)
+    "PGM" => (Dict("3pg_c" => 1, "2pg_c" => -1), :backward),
+    "PYK" => (Dict("pep_c" => -1, "adp_c" => -1, "h_c" => -1.0, "atp_c" => 1.0, "pyr_c" => 1), :forward),
+    "ENO" => (Dict("2pg_c" => 1, "pep_c" => -1, "h2o_c" => -1), :bidirectional),
 )
 
 escherplot!(
