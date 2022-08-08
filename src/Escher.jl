@@ -300,8 +300,8 @@ reaction_edge_color = :black # fallback color
 reaction_edge_widths = Dict{String,Any}() # actual edge width
 reaction_edge_width = 2.0 # fallback width
 reaction_arrow_size = 6
-reaction_arrow_head_offset_fraction = 0.5 # between 0 and 1
-reaction_directions = Dict{String,Tuple{Dict{String,Number},Symbol}}() # rid => (reaction stoichiometry, :f or :r)
+reaction_arrow_head_offset_fraction = 0.1 # between 0 and 1
+reaction_directions = Dict{String,Tuple{Dict{String,Number},Symbol}}() # rid => (reaction stoichiometry, :forward, :backward, :bidirectional)
 annotation_show_text = false
 annotation_text_color = :black
 annotation_text_size = 12
@@ -330,7 +330,7 @@ Get or create maps here: `https://escher.github.io/#/`.
         reaction_edge_width = 2.0, # fallback width
         reaction_arrow_size = 6,
         reaction_arrow_head_offset_fraction = 0.1, # between 0 and 1
-        reaction_directions = Dict{String,Tuple{Dict{String,Number},Symbol}}(), # rid => (reaction stoichiometry, :f or :r)
+        reaction_directions = Dict{String,Tuple{Dict{String,Number},Symbol}}(), # rid => (reaction stoichiometry, :forward, :backward, :bidirectional)
         annotation_show_text = false,
         annotation_text_color = :black,
         annotation_text_size = 12,
@@ -393,8 +393,13 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
         if haskey(reaction_directions, rid)
             rs = first(reaction_directions[rid])
             dir = last(reaction_directions[rid])
-            _d = dir == :f ? 1.0 : -1.0
-            target_metabolites = [mid for (mid, x) in rs if _d * x > 0]
+            if dir == :forward
+                target_metabolites = [mid for (mid, x) in rs if x > 0]
+            elseif dir == :backward 
+                target_metabolites = [mid for (mid, x) in rs if x < 0]
+            else # bidirectional is default
+                target_metabolites = [mid for (mid, x) in rs]
+            end
             for segment in reaction.segments
                 to_metabolite = segment.to_metabolite
                 from_metabolite = segment.from_metabolite
