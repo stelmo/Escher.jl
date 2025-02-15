@@ -1,15 +1,17 @@
 name = "Escher"
 uuid = "8cc96de1-1b23-48cb-9272-618d67962629"
 authors = ["stelmo <stelmozors@gmail.com>"]
-version = "0.7.1"
+version = "0.7.2"
 
 [deps]
+Clustering = "aaaa29a8-35af-508c-8bc3-b662a17a0fe5"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
 [compat]
+Clustering = "0.15.8"
+DocStringExtensions = "0.9"
 JSON = "0.21"
-Makie = "0.2"
-julia = "1.6, 2.0"
-DocStringExtensions = "0.8, 0.9"
+Makie = "0.22"
+julia = "1"

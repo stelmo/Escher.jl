@@ -3,11 +3,6 @@
     <img src="data/logo.svg?maxAge=0" width="30%">
 </div>
 
-[repostatus-url]: https://www.repostatus.org/#active
-[repostatus-img]: https://www.repostatus.org/badges/latest/active.svg
-
-[![repostatus-img]][repostatus-url] [![Escher Downloads](https://shields.io/endpoint?url=https://pkgs.genieframework.com/api/v1/badge/Escher)](https://pkgs.genieframework.com?packages=Escher)
-
 This package implements a [Makie](https://makie.juliaplots.org/stable/index.html)
 recipe called `escherplot` that plots maps of metabolic models resembling its [namesake
 GUI](https://escher.github.io/#/). Its primary purpose is to facilitate the generation of
@@ -21,6 +16,7 @@ place them in the `data`directory.
 ```julia
 using Escher, CairoMakie, ColorSchemes
 using COBREXA, Tulip
+using JSONFBCModels, AbstractFBCModels
 using Clustering
 
 # use COBREXA to generate a flux distribution using the associated model
@@ -30,15 +26,17 @@ Bin fluxes for display purposes - assigning colors to edges needs to be done
 manually. The binning uses kmeans clustering on logged fluxes due to the large
 differences between fluxes.
 =#
-logged_fluxes = log.(abs.(flux_balance_analysis_vec(model, Tulip.Optimizer)) .+ 1e-8)
+sol = flux_balance_analysis(model; optimizer=Tulip.Optimizer).fluxes
+rids = string.(keys(sol))
+fluxes = values(sol)
+logged_fluxes = log.(abs.(fluxes) .+ 1e-8)
 clusters = kmeans(logged_fluxes', 9)
 centers = Dict(j=>i for (i, j) in enumerate(sortperm(clusters.centers'[:])))
 order = [centers[i] for i in assignments(clusters)]
 
-rc = Dict(rid => ColorSchemes.RdYlBu_9[10-k] # map reaction id to color
-    for (rid, k) in zip(reactions(model), order))
+rc = Dict(rid => ColorSchemes.RdYlBu_9[10-k] for (rid, k) in zip(rids, order)) # map reaction id to color
 
-f = Figure(resolution = (1200, 800));
+f = Figure(size = (1200, 800));
 ax = Axis(f[1, 1]);
 escherplot!(
     ax,
@@ -64,7 +62,7 @@ using Escher, CairoMakie, ColorSchemes
 using COBREXA, Tulip
 
 model = load_model(joinpath(pkgdir(Escher), "data", "core-model.json"))
-sol = flux_balance_analysis_dict(model, Tulip.Optimizer)
+sol = Dict(string(k) => v for (k,v) in flux_balance_analysis(model; optimizer=Tulip.Optimizer).fluxes)
 
 # Find min and max absolute fluxes for normalization
 maxflux = maximum(abs.(values(sol)))
@@ -92,14 +90,14 @@ rc = Dict(k => color_interp(v) for (k, v) in sol) # map reaction id to reaction 
 # metabolite node colors
 mc = Dict(
     k => ColorSchemes.:Dark2_7[v] for
-    (k, v) in zip(metabolites(model), rand(1:7, n_metabolites(model)))
+    (k, v) in zip(AbstractFBCModels.metabolites(model), rand(1:7, AbstractFBCModels.n_metabolites(model)))
 )
 
 # metabolite node sizes
-ms = Dict(k => v for (k, v) in zip(metabolites(model), rand(3:10, n_metabolites(model))))
+ms = Dict(k => v for (k, v) in zip(AbstractFBCModels.metabolites(model), rand(3:10, AbstractFBCModels.n_metabolites(model))))
 
 # Normal Makie plotting features all work (escherplot is a full recipe)
-f = Figure(resolution = (1200, 800));
+f = Figure(size = (1200, 800));
 ax = Axis(f[1, 1]);
 escherplot!(
     ax,
@@ -157,7 +155,7 @@ These examples all use the same data as the second example, but demonstrate the 
 different attributes. For brevity it is assumed that the functions below are inserted as
 indicated here:
 ```julia
-f = Figure(resolution = (1200, 800));
+f = Figure(size = (1200, 800));
 ax = Axis(f[1, 1]);
 ###### PLOT FUNCTION
 hidexdecorations!(ax)
