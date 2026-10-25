@@ -452,7 +452,7 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
             ep,
             reaction_labels.labels;
             position = reaction_labels.positions,
-            textsize = ep.reaction_text_size,
+            fontsize = ep.reaction_text_size,
             color = ep.reaction_text_color,
             # align = (:center, :center),
             # justification = :left,
@@ -474,7 +474,7 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
                 ep,
                 label;
                 position = position,
-                textsize = ep.metabolite_text_size,
+                fontsize = ep.metabolite_text_size,
                 color = ep.metabolite_text_color,
                 # align = alignment,
                 # justification = justification,
@@ -488,7 +488,7 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
             ep,
             annotations.labels;
             position = annotations.positions,
-            textsize = ep.annotation_text_size,
+            fontsize = ep.annotation_text_size,
             color = ep.annotation_text_color,
         )
     end
