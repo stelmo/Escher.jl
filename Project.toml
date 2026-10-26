@@ -1,7 +1,7 @@
 name = "Escher"
 uuid = "8cc96de1-1b23-48cb-9272-618d67962629"
 authors = ["stelmo <stelmozors@gmail.com>"]
-version = "0.7.2"
+version = "0.7.3"
 
 [deps]
 Clustering = "aaaa29a8-35af-508c-8bc3-b662a17a0fe5"
