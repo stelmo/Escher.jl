@@ -298,9 +298,9 @@ reaction_text_color = :black
 reaction_edge_colors = Dict{String,Any}() # actual color
 reaction_edge_color = :black # fallback color
 reaction_edge_widths = Dict{String,Any}() # actual edge width
-reaction_edge_width = 2.0 # fallback width
-reaction_arrow_size = 6
-reaction_arrow_head_offset_fraction = 0.1 # between 0 and 1
+reaction_edge_width = 1.0 # fallback width
+reaction_arrow_scale_size = 10.0
+reaction_arrow_head_offset_fraction = 0.2 # between 0 and 1
 reaction_directions = Dict{String,Tuple{Dict{String,Number},Symbol}}() # rid => (reaction stoichiometry, :forward, :backward, :bidirectional)
 annotation_show_text = false
 annotation_text_color = :black
@@ -327,9 +327,9 @@ Get or create maps here: `https://escher.github.io/#/`.
         reaction_edge_colors = Dict{String,Any}(), # actual color
         reaction_edge_color = :black, # fallback color
         reaction_edge_widths = Dict{String,Any}(), # actual edge width
-        reaction_edge_width = 2.0, # fallback width
-        reaction_arrow_size = 6,
-        reaction_arrow_head_offset_fraction = 0.1, # between 0 and 1
+        reaction_edge_width = 1.0, # fallback width
+        reaction_arrow_scale_size = 10.0,
+        reaction_arrow_head_offset_fraction = 0.2, # between 0 and 1
         reaction_directions = Dict{String,Tuple{Dict{String,Number},Symbol}}(), # rid => (reaction stoichiometry, :forward, :backward, :bidirectional)
         annotation_show_text = false,
         annotation_text_color = :black,
@@ -370,8 +370,12 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
 
     # Plot reactions
     reaction_directions = to_value(ep.reaction_directions)
-    reaction_arrow_size = to_value(ep.reaction_arrow_size)
+    reaction_arrow_scale_size = to_value(ep.reaction_arrow_scale_size)
     reaction_arrow_head_offset_fraction = to_value(ep.reaction_arrow_head_offset_fraction)
+
+    # Default Makie arrow tip lengths/widths
+    tip_length = 8
+    tip_width = 14
 
     for reaction in reactions
         rid = reaction.rid
@@ -398,7 +402,7 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
             elseif dir == :backward 
                 target_metabolites = [mid for (mid, x) in rs if x < 0]
             else # bidirectional is default
-                target_metabolites = [mid for (mid, x) in rs]
+                target_metabolites = [mid for (mid, _) in rs]
             end
             for segment in reaction.segments
                 to_metabolite = segment.to_metabolite
@@ -433,14 +437,24 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
                     ),
                 ]
 
-                arrows!(
+                #arrows!(
+                    #ep,
+                    #points,
+                    #directions;
+                    #arrowcolor = color,
+                    #linewidth = 0.0,
+                    #arrowsize = reaction_arrow_size,
+                    #linestyle,
+                #)
+                arrows2d!(
                     ep,
                     points,
                     directions;
-                    arrowcolor = color,
-                    linewidth = 0.0,
-                    arrowsize = reaction_arrow_size,
-                    linestyle,
+                    color = color,
+                    tiplength = tip_length * reaction_arrow_scale_size,
+                    tipwidth = tip_width * reaction_arrow_scale_size,
+                    lengthscale = 20,
+                    shaftwidth = 0.0
                 )
             end
         end
@@ -469,7 +483,13 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
 
     # Plot metabolite labels
     if ep.metabolite_show_text[]
-        for (label, position, alignment, justification) in zip(metabolites.labels, metabolites.label_positions, metabolites.alignments, metabolites.justifications)
+        met_label_list = zip(
+            metabolites.labels,
+            metabolites.label_positions,
+            metabolites.alignments,
+            metabolites.justifications
+        )
+        for (label, position, alignment, justification) in met_label_list
             text!(
                 ep,
                 label;
@@ -482,7 +502,7 @@ function Makie.plot!(ep::EscherPlot{<:Tuple{String}})
         end
     end
 
-    # Plot annotations 
+    # Plot annotations
     if ep.annotation_show_text[]
         text!(
             ep,
